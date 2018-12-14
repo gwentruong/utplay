@@ -31,12 +31,47 @@ void      list_free(Playlist *list);
 int main(void)
 {
     // Create playlist from album
-    Playlist *list   = create_playlist();
-    // int next_track   = 0;
+    Playlist *list = create_playlist();
+    Mix_Music *music;
 
     print_list(list);
 
+    // Start SDL with audio support
+    if (SDL_Init(SDL_INIT_AUDIO) == -1)
+    {
+        printf("SDL_Init: %s\n", SDL_GetError());
+        exit(1);
+    }
 
+    // Open 44.1KHz, signed 16bit, system byte order,
+    // stereo audio, using 1024 byte chunks
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == -1)
+    {
+        printf("Mix_OpenAudio: %s\n", Mix_GetError());
+        exit(2);
+    }
+
+    for (Songs *song = list->head; song != NULL; song = song->next)
+    {
+        // Load the MP3 file "music.mp3" to play as music
+        music = Mix_LoadMUS(song->title);
+        if (!music)
+            printf("Mix_LoadMUS(): %s\n", Mix_GetError());
+
+        // Play music forever
+        if (Mix_PlayMusic(music, -1) == -1)
+            printf("Mix_PlayMusic: %s\n", Mix_GetError());
+
+        while (Mix_PlayingMusic())
+            SDL_Delay(100);
+
+        Mix_FreeMusic(music);
+        music = NULL;
+        SDL_Delay(200);    
+    }
+
+    Mix_CloseAudio();
+    SDL_Quit();
     list_free(list);
     return 0;
 }
