@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
+#include <assert.h>
 #include <SDL.h>
 #include <SDL_mixer.h>
 
@@ -22,7 +23,9 @@ typedef struct playlist
 
 Songs    *new_song(char *title);
 Playlist *create_playlist(void);
-// void     *shuffle(Playlist **ptr_list);
+Songs *nth_remove(Playlist *list, int n);
+Playlist *shuffle(Playlist *list);
+void      prepend(Playlist **ptr_list, Songs *song);
 void      append(Playlist **ptr_list, Songs *song);
 void      print_list(Playlist *list);
 void      list_free(Playlist *list);
@@ -78,6 +81,67 @@ Playlist *create_playlist(void)
     }
     return list;
 }
+
+Songs *nth_remove(Playlist *list, int n)
+{
+    Songs *p = list->head;
+
+    assert(p != NULL);
+    assert(n >= 0 && n <= list->amount);
+
+    if (list->amount == 1 && n == 0)
+    {
+        list->amount--;
+        list->head = NULL;
+        return p;
+    }
+
+    if (n == 0)
+    {
+        list->head = p->next;
+        list->amount--;
+    }
+    else if (n > 0 && n < list->amount)
+    {
+        for (int i = 0; i < n - 1; i++)
+            p = p->next;
+
+        Songs *ptr = p->next;
+        p->next = p->next->next;
+        list->amount--;
+        return ptr;
+    }
+    return p;
+}
+
+void prepend(Playlist **ptr_list, Songs *song)
+{
+    Playlist *p = *ptr_list;
+    song->next = p->head;
+    p->head = song;
+    p->amount++;
+}
+
+Playlist *shuffle(Playlist *list)
+{
+    Playlist *new = malloc(sizeof(Playlist));
+    new->head   = NULL;
+    new->amount = 0;
+
+    time_t t;
+    srand((unsigned) time(&t));
+
+    while (list->head != NULL)
+    {
+        int rand_val = rand() % list->amount;
+        Songs *n = nth_remove(list, rand_val);
+
+        prepend(&new, n);
+    }
+    print_list(new);
+    return new;
+}
+
 
 void append(Playlist **ptr_list, Songs *song)
 {
@@ -143,6 +207,8 @@ void main_menu(Playlist *list)
             info(1);
         else if (cmd[0] == 'l' || cmd[0] == 'L')
             print_list(list);
+        else if (cmd[0] == 's' || cmd[0] == 'S')
+            list = shuffle(list);
         else
         {
             printf("Playing songs from playlist\n");
@@ -265,6 +331,7 @@ void play(Playlist *list)
                 song = song->next;
             }
         }
+
         Mix_FreeMusic(music);
         music = NULL;
         SDL_Delay(200);
