@@ -22,12 +22,12 @@ typedef struct playlist
 
 Songs    *new_song(char *title);
 Playlist *create_playlist(void);
+// void     *shuffle(Playlist **ptr_list);
 void      append(Playlist **ptr_list, Songs *song);
 void      print_list(Playlist *list);
 void      list_free(Playlist *list);
 void      main_menu(Playlist *list);
 void      info(int n);
-void      menu_interact(void);
 void      play(Playlist *list);
 
 int main(void)
@@ -107,7 +107,7 @@ void print_list(Playlist *list)
     if (list->head != NULL)
     {
         for (Songs *p = list->head; p != NULL; p = p->next)
-            printf("Song path %s %p\n", p->title, p);
+            printf("Song title %.64s\n", p->title + 8);
     }
     else
         printf("This playlist is empty.\n");
@@ -128,20 +128,21 @@ void list_free(Playlist *list)
 void main_menu(Playlist *list)
 {
     char cmd[10];
+    int check = 1;
 
-    printf("Type your command : (p)lay , (h)elp, (v)ersion, (q)uit > ");
-    fflush(stdin);
-    while (scanf("%s", cmd))
+    while (check)
     {
+        printf("Type your command : (p)lay , (h)elp, (v)ersion, "
+               "(s)huffle, (l)ist, (q)uit > ");
+        scanf("%s", cmd);
         if (cmd[0] == 'q' || cmd[0] == 'Q')
-        {
-            printf("Thank you for coming! Goodbye!\n");
-            break;
-        }
+            check = 0;
         else if (cmd[0] == 'h' || cmd[0] == 'H')
             info(0);
         else if (cmd[0] == 'v' || cmd[0] == 'V')
             info(1);
+        else if (cmd[0] == 'l' || cmd[0] == 'L')
+            print_list(list);
         else
         {
             printf("Playing songs from playlist\n");
@@ -149,6 +150,7 @@ void main_menu(Playlist *list)
             play(list);
         }
     }
+    printf("Thank you for coming! Goodbye!\n");
 }
 
 void info(int n)
@@ -157,16 +159,16 @@ void info(int n)
     {
         printf("HELP\n"
                "Follow these commands to excute your desire action:\n"
-               "help, h \tShow help menu\n"
-               "version\tShow the latest version of utplay\n"
-               "shuffle\tShuffle the current playlist\n"
-               "play\tStart playing the 1st song from the playlist "
-               "or choose the title of the song\n"
-               "\tstop\tStop playing song\n"
-               "\tpause, p\tPause the current playing song\n"
-               "\tcontinue, c, resume, r\tResume playing the paused song\n"
-               "\tshow\tShow the title of the playing song\n"
-               "quit, q\tQuit the program\n");
+               "(h)elp   \tShow help menu\n"
+               "(v)ersion\tShow the latest version of utplay\n"
+               "(l)ist   \tList the song titles of current playlist\n"
+               "(s)huffle\tShuffle the current playlist\n"
+               "(p)lay   \tStart playing the 1st song from the playlist\n"
+               "\t(P)ause \tPause the current playing song\n"
+               "\t(R)esume\tResume playing the paused song\n"
+               "\t(B)ack  \tBack to the previous song\n"
+               "\t(N)ext  \tJump to the next song\n"
+               "(q)uit   \tQuit the program\n");
     }
     else // Print the latest version
     {
@@ -176,32 +178,13 @@ void info(int n)
     }
 }
 
-void menu_interact(void)
-{
-    char buf[10];
-
-    printf("Available commands: (p)ause, (r)esume, (s)top > ");
-    fflush(stdin);
-    if (scanf("%s", buf) == 1)
-    {
-        switch (buf[0])
-        {
-            case 'p': case 'P':
-                Mix_PauseMusic();
-                break;
-            case 'r': case 'R':
-                Mix_ResumeMusic();
-                break;
-            case 's': case 'S':
-                Mix_HaltMusic();
-                break;
-        }
-    }
-}
-
 void play(Playlist *list)
 {
     Mix_Music *music;
+    char buf[10];
+    Songs *prev_song = NULL;
+    Songs *song      = list->head;
+
     // Start SDL with audio support
     if (SDL_Init(SDL_INIT_AUDIO) == -1)
     {
@@ -217,7 +200,7 @@ void play(Playlist *list)
         exit(2);
     }
 
-    for (Songs *song = list->head; song != NULL; song = song->next)
+    while (song != NULL)
     {
         // Load the MP3 file "music.mp3" to play as music
         music = Mix_LoadMUS(song->title);
@@ -225,12 +208,51 @@ void play(Playlist *list)
             printf("Mix_LoadMUS(): %s\n", Mix_GetError());
 
         // Play music forever
-        if (Mix_PlayMusic(music, -1) == -1)
+        if (Mix_PlayMusic(music, 0) == -1)
             printf("Mix_PlayMusic: %s\n", Mix_GetError());
 
+        printf("Playing %.64s\n", song->title + 8);
         while (Mix_PlayingMusic())
+        {
+            int move_back = 0;
+            int check = 1;
             SDL_Delay(100);
-
+            while (check)
+            {
+                printf("Available commands: (p)ause, (r)esume,"
+                       " (b)ack, (n)ext song > ");
+                if (!Mix_PlayingMusic())
+                {
+                    printf("\n");
+                    check = 0;
+                }
+                else
+                {
+                    scanf("%s", buf);
+                    if (buf[0] == 'p' || buf[0] == 'P')
+                        Mix_PauseMusic();
+                    else if (buf[0] == 'r' || buf[0] == 'R')
+                        Mix_ResumeMusic();
+                    else if (buf[0] == 'n' || buf[0] == 'N')
+                    {
+                        Mix_HaltMusic();
+                        check = 0;
+                    }
+                    else if (buf[0] == 'b' || buf[0] == 'B')
+                    {
+                        Mix_HaltMusic();
+                        song = prev_song;
+                        move_back = 1;
+                        check = 0;
+                    }
+                }
+            }
+            if (!move_back)
+            {
+                prev_song = song;
+                song = song->next;
+            }
+        }
         Mix_FreeMusic(music);
         music = NULL;
         SDL_Delay(200);
