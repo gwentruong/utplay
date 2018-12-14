@@ -32,11 +32,11 @@ int main(void)
 {
     // Create playlist from album
     Playlist *list   = create_playlist();
-    int next_track   = 0;
+    // int next_track   = 0;
 
     print_list(list);
 
-    
+
     list_free(list);
     return 0;
 }
@@ -53,21 +53,27 @@ Songs *new_song(char *title)
 
 Playlist *create_playlist(void)
 {
-    Playlist *list   = malloc(sizeof(struct playlist));
-    list->head = NULL;
-    list->amount     = 0;
+    Playlist *list = malloc(sizeof(struct playlist));
+    list->head     = NULL;
+    list->amount   = 0;
 
     DIR *d;
     struct dirent *dir;
+    char *check_name;
     d = opendir("./album");
 
     if (d)
     {
         while ((dir = readdir(d)) != NULL)
         {
-            char *str = strstr(dir->d_name, ".mp3");
-            if (str != NULL)
-                append(&list, new_song(dir->d_name));
+            check_name = strstr(dir->d_name, ".mp3");
+            if (check_name != NULL)
+            {
+                check_name = malloc(strlen("./album/") + strlen(dir->d_name) + 1);
+                strcpy(check_name, "./album/");
+                strcat(check_name, dir->d_name);
+                append(&list, new_song(check_name));
+            }
         }
         closedir(d);
     }
@@ -102,7 +108,7 @@ void print_list(Playlist *list)
     if (list->head != NULL)
     {
         for (Songs *p = list->head; p != NULL; p = p->next)
-            printf("Song title %s %p\n", p->title, p);
+            printf("Song path %s %p\n", p->title, p);
     }
     else
         printf("This playlist is empty.\n");
@@ -114,6 +120,7 @@ void list_free(Playlist *list)
     {
         list->head = list->head->next;
         list->amount--;
+        free(p->title); // Free check_name
         free(p);
     }
     free(list);
