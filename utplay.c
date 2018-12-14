@@ -22,56 +22,20 @@ typedef struct playlist
 
 Songs    *new_song(char *title);
 Playlist *create_playlist(void);
-void      info(int n);
-void      menu_interact(void);
 void      append(Playlist **ptr_list, Songs *song);
 void      print_list(Playlist *list);
 void      list_free(Playlist *list);
+void      main_menu(Playlist *list);
+void      info(int n);
+void      menu_interact(void);
+void      play(Playlist *list);
 
 int main(void)
 {
     // Create playlist from album
     Playlist *list = create_playlist();
-    Mix_Music *music;
+    main_menu(list);
 
-    print_list(list);
-
-    // Start SDL with audio support
-    if (SDL_Init(SDL_INIT_AUDIO) == -1)
-    {
-        printf("SDL_Init: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    // Open 44.1KHz, signed 16bit, system byte order,
-    // stereo audio, using 1024 byte chunks
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == -1)
-    {
-        printf("Mix_OpenAudio: %s\n", Mix_GetError());
-        exit(2);
-    }
-
-    for (Songs *song = list->head; song != NULL; song = song->next)
-    {
-        // Load the MP3 file "music.mp3" to play as music
-        music = Mix_LoadMUS(song->title);
-        if (!music)
-            printf("Mix_LoadMUS(): %s\n", Mix_GetError());
-
-        // Play music forever
-        if (Mix_PlayMusic(music, -1) == -1)
-            printf("Mix_PlayMusic: %s\n", Mix_GetError());
-
-        while (Mix_PlayingMusic())
-            SDL_Delay(100);
-
-        Mix_FreeMusic(music);
-        music = NULL;
-        SDL_Delay(200);    
-    }
-
-    Mix_CloseAudio();
-    SDL_Quit();
     list_free(list);
     return 0;
 }
@@ -161,6 +125,32 @@ void list_free(Playlist *list)
     free(list);
 }
 
+void main_menu(Playlist *list)
+{
+    char cmd[10];
+
+    printf("Type your command : (p)lay , (h)elp, (v)ersion, (q)uit > ");
+    fflush(stdin);
+    while (scanf("%s", cmd))
+    {
+        if (cmd[0] == 'q' || cmd[0] == 'Q')
+        {
+            printf("Thank you for coming! Goodbye!\n");
+            break;
+        }
+        else if (cmd[0] == 'h' || cmd[0] == 'H')
+            info(0);
+        else if (cmd[0] == 'v' || cmd[0] == 'V')
+            info(1);
+        else
+        {
+            printf("Playing songs from playlist\n");
+            print_list(list);
+            play(list);
+        }
+    }
+}
+
 void info(int n)
 {
     if (n == 0) // Print help menu
@@ -188,13 +178,13 @@ void info(int n)
 
 void menu_interact(void)
 {
-    char cmd[10];
+    char buf[10];
 
     printf("Available commands: (p)ause, (r)esume, (s)top > ");
     fflush(stdin);
-    if (scanf("%s", cmd) == 1)
+    if (scanf("%s", buf) == 1)
     {
-        switch (cmd[0])
+        switch (buf[0])
         {
             case 'p': case 'P':
                 Mix_PauseMusic();
@@ -207,4 +197,45 @@ void menu_interact(void)
                 break;
         }
     }
+}
+
+void play(Playlist *list)
+{
+    Mix_Music *music;
+    // Start SDL with audio support
+    if (SDL_Init(SDL_INIT_AUDIO) == -1)
+    {
+        printf("SDL_Init: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    // Open 44.1KHz, signed 16bit, system byte order,
+    // stereo audio, using 1024 byte chunks
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == -1)
+    {
+        printf("Mix_OpenAudio: %s\n", Mix_GetError());
+        exit(2);
+    }
+
+    for (Songs *song = list->head; song != NULL; song = song->next)
+    {
+        // Load the MP3 file "music.mp3" to play as music
+        music = Mix_LoadMUS(song->title);
+        if (!music)
+            printf("Mix_LoadMUS(): %s\n", Mix_GetError());
+
+        // Play music forever
+        if (Mix_PlayMusic(music, -1) == -1)
+            printf("Mix_PlayMusic: %s\n", Mix_GetError());
+
+        while (Mix_PlayingMusic())
+            SDL_Delay(100);
+
+        Mix_FreeMusic(music);
+        music = NULL;
+        SDL_Delay(200);
+    }
+
+    Mix_CloseAudio();
+    SDL_Quit();
 }
