@@ -168,6 +168,7 @@ void info(int n)
                "\t(R)esume\tResume playing the paused song\n"
                "\t(B)ack  \tBack to the previous song\n"
                "\t(N)ext  \tJump to the next song\n"
+               "\t(S)top  \tStop the music player, back to main menu\n"
                "(q)uit   \tQuit the program\n");
     }
     else // Print the latest version
@@ -184,6 +185,7 @@ void play(Playlist *list)
     char buf[10];
     Songs *prev_song = NULL;
     Songs *song      = list->head;
+    int does_stop    = 0;
 
     // Start SDL with audio support
     if (SDL_Init(SDL_INIT_AUDIO) == -1)
@@ -202,6 +204,9 @@ void play(Playlist *list)
 
     while (song != NULL)
     {
+        if (does_stop) // Stop the music player
+            break;
+
         // Load the MP3 file "music.mp3" to play as music
         music = Mix_LoadMUS(song->title);
         if (!music)
@@ -220,7 +225,7 @@ void play(Playlist *list)
             while (check)
             {
                 printf("Available commands: (p)ause, (r)esume,"
-                       " (b)ack, (n)ext song > ");
+                       " (b)ack, (n)ext song, (s)top > ");
                 if (!Mix_PlayingMusic())
                 {
                     printf("\n");
@@ -245,6 +250,13 @@ void play(Playlist *list)
                         move_back = 1;
                         check = 0;
                     }
+                    else if ((buf[0] == 's' || buf[0] == 'S'))
+                    {
+                        Mix_HaltMusic();
+                        does_stop = 1;
+                        check = 0;
+                    }
+
                 }
             }
             if (!move_back)
