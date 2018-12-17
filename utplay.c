@@ -1,40 +1,44 @@
 /* Author:  Uyen Truong
-   Copyright (C) 2018, utplay v0.1 */
+ * Copyright (C) 2018, utplay v0.1
+ */
 
+#include <assert.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <dirent.h>
 #include <string.h>
-#include <assert.h>
 #include <SDL.h>
 #include <SDL_mixer.h>
 
-typedef struct songs
+typedef struct song
 {
-    char *title;
-    struct songs *next;
-} Songs;
+    char        *title;
+    struct song *next;
+} Song;
 
 typedef struct playlist
 {
-    Songs *head;
-    int amount;
+    Song *head;
+    int   length;
 } Playlist;
 
-Songs    *new_song(char *title);
+Song     *new_song(char *title);
 Playlist *create_playlist(void);
-Songs *nth_remove(Playlist *list, int n);
+Song     *cherry_pick(Playlist *list, int n);
 Playlist *shuffle(Playlist *list);
-void      prepend(Playlist **ptr_list, Songs *song);
-void      append(Playlist **ptr_list, Songs *song);
+void      prepend(Playlist *list, Song *song);
+void      append(Playlist *list, Song *song);
 void      print_list(Playlist *list);
 void      list_free(Playlist *list);
 void      main_menu(Playlist *list);
 void      info(int n);
 void      play(Playlist *list);
 
+// TODO: read album dir from cmd line arg
 int main(void)
 {
+    srand(time(NULL));
+
     // Create playlist from album
     Playlist *list = create_playlist();
     main_menu(list);
@@ -43,9 +47,9 @@ int main(void)
     return 0;
 }
 
-Songs *new_song(char *title)
+Song *new_song(char *title)
 {
-    Songs *p = malloc(sizeof(struct songs));
+    Song *p = malloc(sizeof(struct song));
 
     p->title = title;
     p->next  = NULL;
@@ -57,24 +61,26 @@ Playlist *create_playlist(void)
 {
     Playlist *list = malloc(sizeof(struct playlist));
     list->head     = NULL;
-    list->amount   = 0;
+    list->length   = 0;
 
-    DIR *d;
+    DIR           *d;
     struct dirent *dir;
-    char *check_name;
+    char          *is_mp3;
+    char          *path;
+
     d = opendir("./album");
 
     if (d)
     {
         while ((dir = readdir(d)) != NULL)
         {
-            check_name = strstr(dir->d_name, ".mp3");
-            if (check_name != NULL)
+            is_mp3 = strstr(dir->d_name, ".mp3");
+            if (is_mp3 != NULL)
             {
-                check_name = malloc(strlen("./album/") + strlen(dir->d_name) + 1);
-                strcpy(check_name, "./album/");
-                strcat(check_name, dir->d_name);
-                append(&list, new_song(check_name));
+                path = malloc(strlen("./album/") + strlen(dir->d_name) + 1);
+                strcpy(path, "./album/");
+                strcat(path, dir->d_name);
+                append(list, new_song(path));
             }
         }
         closedir(d);
@@ -82,108 +88,96 @@ Playlist *create_playlist(void)
     return list;
 }
 
-Songs *nth_remove(Playlist *list, int n)
+Song *cherry_pick(Playlist *list, int n)
 {
-    Songs *p = list->head;
+    Song *p = list->head;
 
     assert(p != NULL);
-    assert(n >= 0 && n <= list->amount);
-
-    if (list->amount == 1 && n == 0)
-    {
-        list->amount--;
-        list->head = NULL;
-        return p;
-    }
+    assert(n >= 0 && n < list->length);
 
     if (n == 0)
     {
         list->head = p->next;
-        list->amount--;
+        list->length--;
+        return p;
     }
-    else if (n > 0 && n < list->amount)
+    else
     {
         for (int i = 0; i < n - 1; i++)
             p = p->next;
 
-        Songs *ptr = p->next;
-        p->next = p->next->next;
-        list->amount--;
-        return ptr;
+        Song *cherry = p->next;
+        p->next      = cherry->next;
+        list->length--;
+        return cherry;
     }
-    return p;
 }
 
-void prepend(Playlist **ptr_list, Songs *song)
+void prepend(Playlist *list, Song *song)
 {
-    Playlist *p = *ptr_list;
-    song->next = p->head;
-    p->head = song;
-    p->amount++;
+    song->next = list->head;
+    list->head = song;
+    list->length++;
 }
 
 Playlist *shuffle(Playlist *list)
 {
-    Playlist *new = malloc(sizeof(Playlist));
-    new->head   = NULL;
-    new->amount = 0;
-
-    time_t t;
-    srand((unsigned) time(&t));
+    Playlist *new_list = malloc(sizeof(Playlist));
+    new_list->head   = NULL;
+    new_list->length = 0;
 
     while (list->head != NULL)
     {
-        int rand_val = rand() % list->amount;
-        Songs *n = nth_remove(list, rand_val);
+        int n = rand() % list->length;
+        Song *song = cherry_pick(list, n);
 
-        prepend(&new, n);
+        prepend(new_list, song);
     }
-    print_list(new);
-    return new;
+
+    print_list(new_list);
+    return new_list;
 }
 
 
-void append(Playlist **ptr_list, Songs *song)
+void append(Playlist *list, Song *song)
 {
-    Playlist *temp = *ptr_list;
-
-    if (temp->head == NULL)
+    if (list->head == NULL)
     {
-        temp->head = song;
-        temp->amount++;
+        list->head = song;
+        list->length++;
     }
     else
     {
-        Songs *p = temp->head;
+        Song *p = list->head;
 
         while (p->next != NULL)
             p = p->next;
 
         p->next = song;
         song->next = NULL;
-        temp->amount++;
+        list->length++;
     }
 }
 
 void print_list(Playlist *list)
 {
-    printf("This playlist has %d songs.\n", list->amount);
+
     if (list->head != NULL)
     {
-        for (Songs *p = list->head; p != NULL; p = p->next)
+        printf("This playlist has %d songs\n", list->length);
+        for (Song *p = list->head; p != NULL; p = p->next)
             printf("Song title %.64s\n", p->title + 8);
     }
     else
-        printf("This playlist is empty.\n");
+        printf("This directory doesn't contain mp3 files\n");
 }
 
 void list_free(Playlist *list)
 {
-    for (Songs *p = list->head; p != NULL; p = list->head)
+    for (Song *p = list->head; p != NULL; p = list->head)
     {
         list->head = list->head->next;
-        list->amount--;
-        free(p->title); // Free check_name
+        free(p->title);
         free(p);
     }
     free(list);
@@ -192,7 +186,7 @@ void list_free(Playlist *list)
 void main_menu(Playlist *list)
 {
     char cmd[10];
-    int check = 1;
+    int  check = 1;
 
     while (check)
     {
@@ -211,7 +205,7 @@ void main_menu(Playlist *list)
             list = shuffle(list);
         else
         {
-            printf("Playing songs from playlist\n");
+            printf("Playing song from playlist\n");
             print_list(list);
             play(list);
         }
@@ -248,10 +242,10 @@ void info(int n)
 void play(Playlist *list)
 {
     Mix_Music *music;
-    char buf[10];
-    Songs *prev_song = NULL;
-    Songs *song      = list->head;
-    int does_stop    = 0;
+    char       buf[10];
+    Song      *prev_song = NULL;
+    Song      *song      = list->head;
+    int        does_stop = 0;
 
     // Start SDL with audio support
     if (SDL_Init(SDL_INIT_AUDIO) == -1)
@@ -278,7 +272,6 @@ void play(Playlist *list)
         if (!music)
             printf("Mix_LoadMUS(): %s\n", Mix_GetError());
 
-        // Play music forever
         if (Mix_PlayMusic(music, 0) == -1)
             printf("Mix_PlayMusic: %s\n", Mix_GetError());
 
@@ -322,7 +315,6 @@ void play(Playlist *list)
                         does_stop = 1;
                         check = 0;
                     }
-
                 }
             }
             if (!move_back)
