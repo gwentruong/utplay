@@ -164,9 +164,10 @@ void print_list(Playlist *list)
 
     if (list->head != NULL)
     {
-        printf("This playlist has %d songs\n", list->length);
+        printf("This playlist has %d songs\n\n", list->length);
         for (Song *p = list->head; p != NULL; p = p->next)
-            printf("Song title %.64s\n", p->title + 8);
+            printf("-> %.64s\n", p->title + 8);
+        printf("\n");
     }
     else
         printf("This directory doesn't contain mp3 files\n");
@@ -190,7 +191,7 @@ void main_menu(Playlist *list)
 
     while (check)
     {
-        printf("Type your command : (p)lay , (h)elp, (v)ersion, "
+        printf("Help: (p)lay , (h)elp, (v)ersion, "
                "(s)huffle, (l)ist, (q)uit > ");
         scanf("%s", cmd);
         if (cmd[0] == 'q' || cmd[0] == 'Q')
@@ -204,21 +205,17 @@ void main_menu(Playlist *list)
         else if (cmd[0] == 's' || cmd[0] == 'S')
             list = shuffle(list);
         else
-        {
-            printf("Playing song from playlist\n");
-            print_list(list);
             play(list);
-        }
     }
-    printf("Thank you for coming! Goodbye!\n");
+    printf("\nThank you for coming! Goodbye!\n");
 }
 
 void info(int n)
 {
     if (n == 0) // Print help menu
     {
-        printf("HELP\n"
-               "Follow these commands to excute your desire action:\n"
+        printf("\nHELP\n"
+               "\nFollow these commands to excute your desire action:\n\n"
                "(h)elp   \tShow help menu\n"
                "(v)ersion\tShow the latest version of utplay\n"
                "(l)ist   \tList the song titles of current playlist\n"
@@ -229,13 +226,13 @@ void info(int n)
                "\t(B)ack  \tBack to the previous song\n"
                "\t(N)ext  \tJump to the next song\n"
                "\t(S)top  \tStop the music player, back to main menu\n"
-               "(q)uit   \tQuit the program\n");
+               "(q)uit   \tQuit the program\n\n");
     }
     else // Print the latest version
     {
-        printf("utplay v0.1\n"
+        printf("\nutplay v0.1\n"
                "Copyright (C) 2018 Uyen Truong\n"
-               "Contact me via haiuyentruong(at)gmail(dot)com if found bugs\n");
+               "Contact me via haiuyentruong(at)gmail(dot)com if found bugs\n\n");
     }
 }
 
@@ -275,7 +272,7 @@ void play(Playlist *list)
         if (Mix_PlayMusic(music, 0) == -1)
             printf("Mix_PlayMusic: %s\n", Mix_GetError());
 
-        printf("Playing %.64s\n", song->title + 8);
+        printf("\n💿 Playing %.64s\n\n", song->title + 8);
         while (Mix_PlayingMusic())
         {
             int move_back = 0;
@@ -283,8 +280,8 @@ void play(Playlist *list)
             SDL_Delay(100);
             while (check)
             {
-                printf("Available commands: (p)ause, (r)esume,"
-                       " (b)ack, (n)ext song, (s)top > ");
+                printf("Help: (p)ause, (r)esume,"
+                       " (b)efore, (n)ext, (s)top > ");
                 if (!Mix_PlayingMusic())
                 {
                     printf("\n");
