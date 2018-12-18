@@ -23,7 +23,7 @@ typedef struct playlist
 } Playlist;
 
 Song     *new_song(char *title);
-Playlist *create_playlist(void);
+Playlist *create_playlist(char *dir_path);
 Song     *cherry_pick(Playlist *list, int n);
 Playlist *shuffle(Playlist *list);
 void      prepend(Playlist *list, Song *song);
@@ -35,12 +35,13 @@ void      info(int n);
 void      play(Playlist *list);
 
 // TODO: read album dir from cmd line arg
-int main(void)
+int main(int argc, char ** argv)
 {
     srand(time(NULL));
+    char *dir_path = argv[1];
 
     // Create playlist from album
-    Playlist *list = create_playlist();
+    Playlist *list = create_playlist(dir_path);
     main_menu(list);
 
     list_free(list);
@@ -57,7 +58,7 @@ Song *new_song(char *title)
     return p;
 }
 
-Playlist *create_playlist(void)
+Playlist *create_playlist(char *dir_path)
 {
     Playlist *list = malloc(sizeof(struct playlist));
     list->head     = NULL;
@@ -68,7 +69,7 @@ Playlist *create_playlist(void)
     char          *is_mp3;
     char          *path;
 
-    d = opendir("./album");
+    d = opendir(dir_path);
 
     if (d)
     {
@@ -77,8 +78,8 @@ Playlist *create_playlist(void)
             is_mp3 = strstr(dir->d_name, ".mp3");
             if (is_mp3 != NULL)
             {
-                path = malloc(strlen("./album/") + strlen(dir->d_name) + 1);
-                strcpy(path, "./album/");
+                path = malloc(strlen(dir_path) + strlen(dir->d_name) + 1);
+                strcpy(path, dir_path);
                 strcat(path, dir->d_name);
                 append(list, new_song(path));
             }
