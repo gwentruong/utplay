@@ -23,6 +23,8 @@ typedef struct playlist
     int   length;
 } Playlist;
 
+int to_quit = 0;
+
 Song     *new_song(char *title);
 Playlist *create_playlist(char *dir_path);
 Song     *cherry_pick(Playlist *list, int n);
@@ -208,15 +210,14 @@ void list_free(Playlist *list)
 void main_menu(Playlist *list)
 {
     char cmd[10];
-    int  check = 1;
 
-    while (check)
+    while (!to_quit)
     {
         printf("Help: (p)lay , (h)elp, (v)ersion, "
                "(s)huffle, (l)ist, (q)uit > ");
         scanf("%s", cmd);
         if (cmd[0] == 'q' || cmd[0] == 'Q')
-            check = 0;
+            to_quit = 1;
         else if (cmd[0] == 'h' || cmd[0] == 'H')
             info(0);
         else if (cmd[0] == 'v' || cmd[0] == 'V')
@@ -279,11 +280,8 @@ void play(Playlist *list)
         exit(2);
     }
 
-    while (song != NULL)
+    while (!does_stop)
     {
-        if (does_stop) // Stop the music player
-            break;
-
         // Load the MP3 file "music.mp3" to play as music
         music = Mix_LoadMUS(song->title);
         if (!music)
@@ -314,10 +312,13 @@ void play(Playlist *list)
                     Mix_HaltMusic();
                     song = song->prev->prev;
                 }
-                else if ((buf[0] == 's' || buf[0] == 'S'))
+                else if ((buf[0] == 's' || buf[0] == 'S'
+                        || buf[0] == 'q' || buf[0] == 'Q'))
                 {
                     Mix_HaltMusic();
                     does_stop = 1;
+                    if (buf[0] == 'q' || buf[0] == 'Q')
+                        to_quit = 1;
                 }
             }
         }
