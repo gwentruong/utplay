@@ -13,6 +13,7 @@
 typedef struct song
 {
     char        *title;
+    struct song *prev;
     struct song *next;
 } Song;
 
@@ -26,8 +27,7 @@ Song     *new_song(char *title);
 Playlist *create_playlist(char *dir_path);
 Song     *cherry_pick(Playlist *list, int n);
 Playlist *shuffle(Playlist *list);
-void      prepend(Playlist *list, Song *song);
-void      append(Playlist *list, Song *song);
+void      insert(Playlist *list, Song *song);
 void      print_list(Playlist *list);
 void      list_free(Playlist *list);
 void      main_menu(Playlist *list);
@@ -53,7 +53,8 @@ Song *new_song(char *title)
     Song *p = malloc(sizeof(struct song));
 
     p->title = title;
-    p->next  = NULL;
+    p->prev  = p;
+    p->next  = p;
 
     return p;
 }
@@ -81,12 +82,29 @@ Playlist *create_playlist(char *dir_path)
                 path = malloc(strlen(dir_path) + strlen(dir->d_name) + 1);
                 strcpy(path, dir_path);
                 strcat(path, dir->d_name);
-                append(list, new_song(path));
+                insert(list, new_song(path));
             }
         }
         closedir(d);
     }
     return list;
+}
+
+void insert(Playlist *list, Song *song)
+{
+    Song *head = list->head;
+
+    if (head == NULL)
+        list->head = song;
+    else
+    {
+        Song *last = head->prev;
+        song->next = head;
+        head->prev = song;
+        song->prev = last;
+        last->next = song;
+    }
+    list->length++;
 }
 
 Song *cherry_pick(Playlist *list, int n)
@@ -96,9 +114,19 @@ Song *cherry_pick(Playlist *list, int n)
     assert(p != NULL);
     assert(n >= 0 && n < list->length);
 
+    if (p->next == list->head)
+    {
+        list->head = NULL; // Set head as NULL as p was removed
+        return p;
+    }
+
+
     if (n == 0)
     {
-        list->head = p->next;
+        p->prev->next = p->next;
+        p->next->prev = p->prev;
+        list->head = p->next;      // Set new head
+        p->next = p->prev = p;
         list->length--;
         return p;
     }
@@ -108,80 +136,72 @@ Song *cherry_pick(Playlist *list, int n)
             p = p->next;
 
         Song *cherry = p->next;
-        p->next      = cherry->next;
+        p->next = cherry->next;
+        cherry->next->prev = p;
+        cherry->next = cherry->prev = cherry;
         list->length--;
         return cherry;
     }
 }
 
-void prepend(Playlist *list, Song *song)
-{
-    song->next = list->head;
-    list->head = song;
-    list->length++;
-}
-
 Playlist *shuffle(Playlist *list)
 {
-    Playlist *new_list = malloc(sizeof(Playlist));
-    new_list->head   = NULL;
-    new_list->length = 0;
+    Playlist *new_list = malloc(sizeof(struct playlist));
+    new_list->head     = NULL;
+    new_list->length   = 0;
 
     while (list->head != NULL)
     {
         int n = rand() % list->length;
-        Song *song = cherry_pick(list, n);
+        Song *cherry = cherry_pick(list, n);
 
-        prepend(new_list, song);
+        insert(new_list, cherry);
     }
-
     print_list(new_list);
     return new_list;
 }
 
 
-void append(Playlist *list, Song *song)
-{
-    if (list->head == NULL)
-    {
-        list->head = song;
-        list->length++;
-    }
-    else
-    {
-        Song *p = list->head;
-
-        while (p->next != NULL)
-            p = p->next;
-
-        p->next = song;
-        song->next = NULL;
-        list->length++;
-    }
-}
-
 void print_list(Playlist *list)
 {
+    Song *p = list->head;
 
     if (list->head != NULL)
     {
-        printf("This playlist has %d songs\n\n", list->length);
-        for (Song *p = list->head; p != NULL; p = p->next)
+        if (p->next == p)
+        {
+            printf("This playlist has %d songs\n\n", list->length);
             printf("-> %.64s\n", p->title + 8);
+        }
+        else
+        {
+            printf("This playlist has %d songs\n\n", list->length);
+            while (p->next != list->head)
+            {
+                printf("-> %.64s\n", p->title + 8);
+                p = p->next;
+            }
+            printf("-> %.64s\n", p->title + 8);
+        }
         printf("\n");
     }
     else
-        printf("This directory doesn't contain mp3 files\n");
+        printf("This directory doesn't contain mp3 files\n\n");
 }
 
 void list_free(Playlist *list)
 {
-    for (Song *p = list->head; p != NULL; p = list->head)
+    Song *head = list->head;
+    Song *p    = list->head;
+
+    for (; list->head->next != head; p = list->head)
     {
         list->head = list->head->next;
         free(p->title);
         free(p);
     }
+    free(p->title);
+    free(p);
     free(list);
 }
 
@@ -241,7 +261,6 @@ void play(Playlist *list)
 {
     Mix_Music *music;
     char       buf[10];
-    Song      *prev_song = NULL;
     Song      *song      = list->head;
     int        does_stop = 0;
 
@@ -276,49 +295,30 @@ void play(Playlist *list)
         printf("\n💿 Playing %.64s\n\n", song->title + 8);
         while (Mix_PlayingMusic())
         {
-            int move_back = 0;
-            int check = 1;
             SDL_Delay(100);
-            while (check)
+            for (; Mix_PlayingMusic() == 1 || Mix_PausedMusic() == 1; song = song->next)
             {
                 printf("Help: (p)ause, (r)esume,"
                        " (b)efore, (n)ext, (s)top > ");
-                if (!Mix_PlayingMusic())
+                scanf("%s", buf);
+                if (buf[0] == 'p' || buf[0] == 'P')
+                    Mix_PauseMusic();
+                else if (buf[0] == 'r' || buf[0] == 'R')
+                    Mix_ResumeMusic();
+                else if (buf[0] == 'n' || buf[0] == 'N')
                 {
-                    printf("\n");
-                    check = 0;
+                    Mix_HaltMusic();
                 }
-                else
+                else if (buf[0] == 'b' || buf[0] == 'B')
                 {
-                    scanf("%s", buf);
-                    if (buf[0] == 'p' || buf[0] == 'P')
-                        Mix_PauseMusic();
-                    else if (buf[0] == 'r' || buf[0] == 'R')
-                        Mix_ResumeMusic();
-                    else if (buf[0] == 'n' || buf[0] == 'N')
-                    {
-                        Mix_HaltMusic();
-                        check = 0;
-                    }
-                    else if (buf[0] == 'b' || buf[0] == 'B')
-                    {
-                        Mix_HaltMusic();
-                        song = prev_song;
-                        move_back = 1;
-                        check = 0;
-                    }
-                    else if ((buf[0] == 's' || buf[0] == 'S'))
-                    {
-                        Mix_HaltMusic();
-                        does_stop = 1;
-                        check = 0;
-                    }
+                    Mix_HaltMusic();
+                    song = song->prev->prev;
                 }
-            }
-            if (!move_back)
-            {
-                prev_song = song;
-                song = song->next;
+                else if ((buf[0] == 's' || buf[0] == 'S'))
+                {
+                    Mix_HaltMusic();
+                    does_stop = 1;
+                }
             }
         }
 
