@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <SDL.h>
 #include <SDL_mixer.h>
 
@@ -36,7 +39,8 @@ void      main_menu(Playlist *list);
 void      info(int n);
 void      play(Playlist *list);
 
-// TODO: read album dir from cmd line arg
+
+
 int main(int argc, char ** argv)
 {
     srand(time(NULL));
@@ -265,6 +269,14 @@ void play(Playlist *list)
     Song      *song      = list->head;
     int        does_stop = 0;
 
+    fd_set         rfds;
+    struct timeval tv;
+    int            retval;
+
+    /* Wait up to 1 second. */
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+
     // Start SDL with audio support
     if (SDL_Init(SDL_INIT_AUDIO) == -1)
     {
@@ -291,22 +303,41 @@ void play(Playlist *list)
             printf("Mix_PlayMusic: %s\n", Mix_GetError());
 
         printf("\n💿 Playing %.64s\n\n", song->title + 8);
-        while (Mix_PlayingMusic())
+
+        printf("Help: (p)ause, (r)esume,"
+               " (b)efore, (n)ext, (s)top, (q)uit > ");
+        fflush(stdout);
+
+        while (Mix_PlayingMusic() || Mix_PausedMusic())
         {
-            SDL_Delay(100);
-            for (; Mix_PlayingMusic() == 1 || Mix_PausedMusic() == 1; song = song->next)
+            /* Watch stdin (fd 0) to see when it has input. */
+            FD_ZERO(&rfds);
+            FD_SET(0, &rfds);
+            retval = select(1, &rfds, NULL, NULL, &tv);
+
+            if (retval == -1)
+                perror("select()");
+            else if (retval)
             {
-                printf("Help: (p)ause, (r)esume,"
-                       " (b)efore, (n)ext, (s)top > ");
+                memset(buf, 0, sizeof(buf));
                 scanf("%s", buf);
+
                 if (buf[0] == 'p' || buf[0] == 'P')
-                    Mix_PauseMusic();
-                else if (buf[0] == 'r' || buf[0] == 'R')
-                    Mix_ResumeMusic();
-                else if (buf[0] == 'n' || buf[0] == 'N')
                 {
-                    Mix_HaltMusic();
+                    printf("Help: (p)ause, (r)esume,"
+                           " (b)efore, (n)ext, (s)top, (q)uit > ");
+                    fflush(stdout);
+                    Mix_PauseMusic();
                 }
+                else if (buf[0] == 'r' || buf[0] == 'R')
+                {
+                    printf("Help: (p)ause, (r)esume,"
+                           " (b)efore, (n)ext, (s)top, (q)uit > ");
+                    fflush(stdout);
+                    Mix_ResumeMusic();
+                }        
+                else if (buf[0] == 'n' || buf[0] == 'N')
+                    Mix_HaltMusic();
                 else if (buf[0] == 'b' || buf[0] == 'B')
                 {
                     Mix_HaltMusic();
@@ -321,6 +352,7 @@ void play(Playlist *list)
                         to_quit = 1;
                 }
             }
+            song = song->next;
         }
 
         Mix_FreeMusic(music);
